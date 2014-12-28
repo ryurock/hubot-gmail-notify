@@ -3,6 +3,10 @@ expect = require('chai').expect
 Robot       = require('hubot/src/robot')  
 TextMessage = require('hubot/src/message').TextMessage
 
+#
+# google-oauth
+# Reference Hubot to Mocha. http://devlog.forkwell.com/2014/10/28/testable-hubot-tdddetesutowoshu-kinagarabotwozuo-ru
+#/
 describe 'google-oauth', ->
   robot   = null
   user    = null
@@ -47,6 +51,9 @@ describe 'google-oauth', ->
     delete process.env.HUBOT_GOOGLE_REDIRECT_URL
     adapter.receive(new TextMessage(user, 'Hubot google oauth generate auth url'))
 
+  #
+  # Hubot google oauth generate auht url
+  #
   it 'responds failed. "google oauth generate auth url" because process.env.HUBOT_GOOGLE_CLIENT_SECRET not setting', (done) ->
     adapter.on 'reply', (envelope, strings) ->
       expect(strings[0]).to.equal('google project required. client Secret hubot cli use HUBOT_GOOGLE_CLIENT_SECRET={client secret}')
@@ -57,6 +64,9 @@ describe 'google-oauth', ->
     delete process.env.HUBOT_GOOGLE_REDIRECT_URL
     adapter.receive(new TextMessage(user, 'Hubot google oauth generate auth url'))
 
+  #
+  # Hubot google oauth generate auht url
+  #
   it 'responds failed. "google oauth generate auth url" because process.env.HUBOT_GOOGLE_REDIRECT_URL not setting', (done) ->
     adapter.on 'reply', (envelope, strings) ->
       expect(strings[0]).to.equal('google project required. Redirect Url hubot cli use HUBOT_GOOGLE_REDIRECT_URL={redirect url}')
@@ -67,6 +77,9 @@ describe 'google-oauth', ->
     delete process.env.HUBOT_GOOGLE_REDIRECT_URL
     adapter.receive(new TextMessage(user, 'Hubot google oauth generate auth url'))
 
+  #
+  # Hubot google oauth generate auht url
+  #
   it 'responds success. "google oauth generate auth url"', (done) ->
     adapter.on 'reply', (envelope, strings) ->
       expect(strings[0]).to.match(/^Auth URL/)
@@ -91,6 +104,9 @@ describe 'google-oauth', ->
     delete process.env.HUBOT_GOOGLE_REDIRECT_URL
     adapter.receive(new TextMessage(user, 'Hubot google oauth set token hoge'))
 
+  #
+  # Hubot google oauth set token
+  #
   it 'responds failed. "google oauth set token <code>" because process.env.HUBOT_GOOGLE_CLIENT_SECRET not setting', (done) ->
     adapter.on 'reply', (envelope, strings) ->
       expect(strings[0]).to.equal('google project required. client Secret hubot cli use HUBOT_GOOGLE_CLIENT_SECRET={client secret}')
@@ -101,6 +117,9 @@ describe 'google-oauth', ->
     delete process.env.HUBOT_GOOGLE_REDIRECT_URL
     adapter.receive(new TextMessage(user, 'Hubot google oauth set token hoge'))
 
+  #
+  # Hubot google oauth set token
+  #
   it 'responds failed. "google oauth set token <code>" because process.env.HUBOT_GOOGLE_REDIRECT_URL not setting', (done) ->
     adapter.on 'reply', (envelope, strings) ->
       expect(strings[0]).to.equal('google project required. Redirect Url hubot cli use HUBOT_GOOGLE_REDIRECT_URL={redirect url}')
@@ -111,6 +130,9 @@ describe 'google-oauth', ->
     delete process.env.HUBOT_GOOGLE_REDIRECT_URL
     adapter.receive(new TextMessage(user, 'Hubot google oauth set token hoge'))
 
+  #
+  # Hubot google oauth set token
+  #
   it 'responds failed. "google oauth set token <code>" because process.env.REDIS_URL not setting', (done) ->
     adapter.on 'reply', (envelope, strings) ->
       expect(strings[0]).to.equal('hubot redis brain not using. hubot cli REDIS_URL=redis://127.0.0.1:6379/hubot ./bin/hubot')
@@ -121,6 +143,9 @@ describe 'google-oauth', ->
     process.env.HUBOT_GOOGLE_REDIRECT_URL  = 'urn:ietf:wg:oauth:2.0:oob'
     adapter.receive(new TextMessage(user, 'Hubot google oauth set token hoge'))
 
+  #
+  # Hubot google oauth set token
+  #
   it 'responds failed. "google oauth set token <code>" because code empty', (done) ->
     adapter.on 'reply', (envelope, strings) ->
       expect(strings[0]).to.equal("oauth code not found. Please try 'hubot google oauth generate auth url")
@@ -147,6 +172,9 @@ describe 'google-oauth', ->
     delete process.env.REDIS_URL
     adapter.receive(new TextMessage(user, 'Hubot google oauth set scope hoge'))
 
+  #
+  # Hubot google oauth set scope
+  #
   it 'responds failed. "google oauth set scope <scope>" because process.env.HUBOT_GOOGLE_CLIENT_SECRET not setting', (done) ->
     adapter.on 'reply', (envelope, strings) ->
       expect(strings[0]).to.equal('google project required. client Secret hubot cli use HUBOT_GOOGLE_CLIENT_SECRET={client secret}')
