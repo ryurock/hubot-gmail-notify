@@ -31,7 +31,7 @@ You can start hubot-gmail-notify locally by running:
 
     % mocha --compilers coffee:coffee-script/register --recursive -R spec
 
-the thing.
+[Mocha](http://mochajs.org/) to Hubot Reference URL [Testable Hubot - TDDでテストを書きながらbotを作る](http://devlog.forkwell.com/2014/10/28/testable-hubot-tdddetesutowoshu-kinagarabotwozuo-ru/)
 
 ### hubot-scripts
 
