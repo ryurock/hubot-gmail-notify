@@ -24,8 +24,59 @@ You can start hubot-gmail-notify locally by running:
 | HUBOT_GOOGLE_REDIRECT_URL  | Google Developers Console Project. Redirect Url |
 | REDIS_URL                  | [hubot brain](https://github.com/github/hubot/blob/master/docs/scripting.md#persistence) redis settings|
 
+## Usage
 
+Example [Gmail APIs](https://developers.google.com/gmail/api/?hl=ja) Auth authorization.
 
+### Step1. Find Scope Page
+
+Gmail Auth Scope Find
+
+```
+Hubot> hubot google oauth scope help
+Shell: Google Apis Authorizing OAuth2 scope help.
+ Google Apis Drive scope.        https://developers.google.com/drive/web/scopes
+ Google Apis Calender scope.     https://developers.google.com/google-apps/calendar/auth
+ Google Apis BigQuery scope.     https://cloud.google.com/bigquery/authorization
+ Google Apis Gmail scope.        https://developers.google.com/gmail/api/auth/scopes
+ more Apis.                      https://developers.google.com/apis-explorer/#p/
+```
+
+### Step2. Set Scope
+
+Gmail Read Only Permission scope set
+
+```
+Hubot> hubot google oauth set scope https://www.googleapis.com/auth/gmail.readonly
+Shell: Google Oauth scope set.
+scopes: https://www.googleapis.com/auth/gmail.readonly
+```
+
+### Step3. generate Oauth2 Auth Page URL
+
+```
+Hubot> hubot google oauth generate auth url
+Shell: Auth URL
+https://accounts.google.com/o/oauth2/auth?access_type=offline&scope=https%3A%2F%2Fwww.googleapis.com%2Fauth%2Fgmail.readonly&response_type=code&client_id={your client id}&redirect_uri=urn%3Aietf%3Awg%3Aoauth%3A2.0%3Aoob
+```
+
+respond URL copy access to Browser. Google Auth ACL confirm Page push accept botton. Please keep the code that is displayed in response to the request
+
+### Step4. set Token
+
+```
+Hubot> Hubot google oauth set token {your get code}
+Hubot> Shell: token set Credentials
+access_token: {access_token}
+refresh_token: {refresh token}
+expiry_date: 1419773035086
+```
+
+Token information is saved in hubot.brain When you run this command
+
+### Step5. Gmail Apis Request
+
+@todo
 
 ### Running hubot-gmail-notify testing mocha
 
