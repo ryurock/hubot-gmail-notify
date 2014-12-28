@@ -10,44 +10,52 @@
 #
 module.exports = (robot) ->
 
-  BRAIN_KEY_TOKENS = 'google_oauth_tokens'
-  BRAIN_KEY_SCOPE  = 'google_oauth_scope'
-
   ENV_VALID_MESSAGE_CLIENT_ID     = 'google project required. client Id hubot cli use HUBOT_GOOGLE_CLIENT_ID={client id}'
   ENV_VALID_MESSAGE_CLIENT_SECRET = 'google project required. client Secret hubot cli use HUBOT_GOOGLE_CLIENT_SECRET={client secret}'
   ENV_VALID_MESSAGE_REDIRECT_URL   = 'google project required. Redirect Url hubot cli use HUBOT_GOOGLE_REDIRECT_URL={redirect url}'
   ENV_VALID_MESSAGE_REDIS_URL      = 'hubot redis brain not using. hubot cli REDIS_URL=redis://127.0.0.1:6379/hubot ./bin/hubot'
 
-  google = require('googleapis')
-  OAuth2 = google.auth.OAuth2
+  google      = require('googleapis')
+  OAuth2      = google.auth.OAuth2
+  brainKeys   = require('./../configs/brain_key.json')
+
+  #
+  # Google Oauth Client
+  # @return {OAuth2}
+  #
+  getOauthClient = () ->
+    return new OAuth2(
+      process.env.HUBOT_GOOGLE_CLIENT_ID,
+      process.env.HUBOT_GOOGLE_CLIENT_SECRET,
+      process.env.HUBOT_GOOGLE_REDIRECT_URL)
 
   #
   # getter tokens
   # @return {object} token response
   #
   getOauthTokens = () ->
-    return robot.brain.get BRAIN_KEY_TOKENS
+    return robot.brain.get(brainKeys.tokens)
 
   #
   # setter tokens
   # @param {object} token response
   #
   setOauthTokens = (tokens) ->
-    return robot.brain.set BRAIN_KEY_TOKENS, tokens
+    return robot.brain.set(brainKeys.tokens, tokens)
 
   #
   # getter scope
   # @return {Array} scopes ex. ['https://www.googleapis.com/auth/gmail.modify', 'https://www.googleapis.com/auth/gmail.readonly']
   #
   getScope = () ->
-    return JSON.parse(robot.brain.get BRAIN_KEY_SCOPE)
+    return JSON.parse(robot.brain.get brainKeys.scope)
 
   #
   # setter scope
   # @param {Array} scopes
   #
   setScope = (scope) ->
-    return robot.brain.set(BRAIN_KEY_SCOPE, JSON.stringify([scope]))
+    return robot.brain.set(brainKeys.scope, JSON.stringify([scope]))
 
   #
   # add scope
@@ -56,7 +64,7 @@ module.exports = (robot) ->
   addScope = (scope) ->
     scopes = getScope()
     scopes.push(scope)
-    return robot.brain.set BRAIN_KEY_SCOPE, JSON.stringify(scopes)
+    return robot.brain.set brainKeys.scope, JSON.stringify(scopes)
 
   #
   # respond generate URL. Google OAuth2 Authorizing Page
@@ -67,8 +75,7 @@ module.exports = (robot) ->
     return msg.reply ENV_VALID_MESSAGE_CLIENT_SECRET unless process.env.HUBOT_GOOGLE_CLIENT_SECRET?
     return msg.reply ENV_VALID_MESSAGE_REDIRECT_URL  unless process.env.HUBOT_GOOGLE_REDIRECT_URL?
 
-    OAuth2 = google.auth.OAuth2
-    oauth2Client = new OAuth2 process.env.HUBOT_GOOGLE_CLIENT_ID, process.env.HUBOT_GOOGLE_CLIENT_SECRET, process.env.HUBOT_GOOGLE_REDIRECT_URL
+    oauth2Client = getOauthClient()
     scopes = getScope()
     scopes = ['https://www.googleapis.com/auth/gmail.readonly'] unless scopes?
     url = oauth2Client.generateAuthUrl({
@@ -90,7 +97,7 @@ module.exports = (robot) ->
     code = msg.match[2]
     return msg.reply "oauth code not found. Please try 'hubot google oauth generate auth url" unless code?
 
-    oauth2Client = new OAuth2(process.env.HUBOT_GOOGLE_CLIENT_ID, process.env.HUBOT_GOOGLE_CLIENT_SECRET, process.env.HUBOT_GOOGLE_REDIRECT_URL)
+    oauth2Client = getOauthClient()
     oauth2Client.getToken(code, (err, tokens) ->
       return msg.reply "get token failed. reason #{err}" if err?
       setOauthTokens tokens
