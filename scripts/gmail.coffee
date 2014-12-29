@@ -62,6 +62,23 @@ module.exports = (robot) ->
   setOauthTokens = (tokens) ->
     return robot.brain.set(brainKeys.tokens, tokens)
 
+  #
+  # merge messages.get and messages.list
+  # @param {Object} response Google Apis Gmail::Users.messages:get response
+  # @param {Object} messages data object
+  # @param {Number} terget messages.list key
+  # @return {Object} merge data
+  #
+  mergeResponseMessages = (response, messages, num) ->
+    messages[num].title = ''
+    messages[num].body = ''
+    async.eachSeries response.payload.headers, (val, next) ->
+      return next() if val.name != 'Subject'
+      messages[num].title = val.value
+
+    messages[num].body = base64url.decode(response.payload.body.data)
+    return messages
+
   robot.respond /google\s*(.gmail\sget\smessages\slist)\s?(.*)?$/i, (msg) ->
     limit = 5
     limit = msg.match[2] if msg.match[2]?
@@ -91,7 +108,7 @@ module.exports = (robot) ->
       (data, callback) ->
         return callback(null, data) if data.tokenExpireOver == false
 
-        console.log 'token Expire retry'
+        #console.log 'token Expire retry'
         OAuthClient.refreshAccessToken (err, tokens) ->
           return callback('failed. Google OAuth get refresh token', err) if err?
 
@@ -107,6 +124,7 @@ module.exports = (robot) ->
       (data, callback) ->
         data.tokenExpireOver = false
         data.messages = { num : 0 }
+
         async.eachSeries data.response.messages, (val, next) ->
           gmail.users.messages.get {
             userId : 'me',
@@ -114,14 +132,7 @@ module.exports = (robot) ->
             id     : val.id
           }, (err, response) ->
             unless err?
-              data.response.messages[data.messages.num].title = ''
-              data.response.messages[data.messages.num].body = ''
-              async.eachSeries response.payload.headers, (val, next) ->
-                return next() if val.name != 'Subject'
-                data.response.messages[data.messages.num].title = val.value
-
-              data.response.messages[data.messages.num].body = base64url.decode(response.payload.body.data)
-
+              data.response.messages = mergeResponseMessages(response, data.response.messages, data.messages.num)
               data.messages.num++
               return next()
 
@@ -129,7 +140,7 @@ module.exports = (robot) ->
             if err.code == 401
               data.tokenExpireOver = true
               data.next            = next
-              console.log 'token expire here'
+              #console.log 'token expire here'
               return callback(null, data)
 
         , (err) -> #async.eachSeries done
@@ -141,7 +152,6 @@ module.exports = (robot) ->
     (data, callback) ->
       # before callback each series end point.
       return callback(null, data.response.messages) if data.tokenExpireOver == false
-      console.log data
       OAuthClient.refreshAccessToken (err, tokens) ->
         return callback('failed. Google OAuth get refresh token', err) if err?
 
@@ -153,16 +163,8 @@ module.exports = (robot) ->
           id     : data.response.messages[data.messages.num].id
         }, (err, response) ->
           return callback('failed. Gmail API Users.messages.get', err) if err?
-          console.log 'retry messages get'
-
-          data.response.messages[data.messages.num].title = ''
-          data.response.messages[data.messages.num].body = ''
-          async.eachSeries response.payload.headers, (val, next) ->
-            return next() if val.name != 'Subject'
-            data.response.messages[data.messages.num].title = val.value
-
-          data.response.messages[data.messages.num].body = base64url.decode(response.payload.body.data)
-
+          #console.log 'retry messages get'
+          data.response.messages = mergeResponseMessages(response, data.response.messages, data.messages.num)
           data.messages.num++
           return data.next()
     #data toString
