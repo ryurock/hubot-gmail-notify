@@ -32,6 +32,7 @@ module.exports = (robot) ->
   base64url = require('base64url')
 
   brainKeys = require('./../configs/brain_key.json')
+  response = []
 
   #
   # Array chunk
@@ -81,45 +82,75 @@ module.exports = (robot) ->
   setOauthTokens = (tokens) ->
     return robot.brain.set(brainKeys.tokens, tokens)
 
-  #
-  # merge messages.get and messages.list
-  # @param {Object} response Google Apis Gmail::Users.messages:get response
-  # @param {Object} messages data object
-  # @param {Number} terget messages.list key
-  # @return {Object} merge data
-  #
-  mergeResponseMessages = (response, messages, num) ->
-    messages[num].title = ''
-    messages[num].body = ''
 
-    async.eachSeries response.payload.headers, (val, next) ->
-      return next() if val.name != 'Subject'
-      messages[num].title = val.value
+  replyParse = (messages, callback) ->
+    replyText = []
+    async.eachSeries messages, (val, next) ->
+      replyText.push(val.title.replace(/[\n\r]/g,"\n"))
+      #replyText.push(val.body.replace(/[\n\r]/g,"\n"))
+      next()
+    , (err) -> #async eachSeries done
+      return callback(null, replyText.join("\n"))
 
-    messages[num].body = base64url.decode(response.payload.body.data) if response.payload.body.size > 0
-    return messages
+  getLabelsList = (options, msg) ->
+    OAuthClient = getOAuthClient()
+
+    params =
+      userId     : 'me'
+      auth       : OAuthClient
+
+    async.waterfall([
+      # get users labels list(Id list)
+      (callback) ->
+        return callback({ notExistsLabelName : true}, null) unless options.labelName?
+
+        gmail.users.labels.list params, (err, response) ->
+          return callback(null, response.labels) unless err?
+
+          # token Expire over
+          if err.code == 401
+            OAuthClient.refreshAccessToken (err, tokens) ->
+              return callback('failed. Google OAuth get refresh token', err) if err?
+
+              setOauthTokens(tokens)
+              OAuthClient.setCredentials( access_token : tokens.access_token, refresh_token: tokens.refresh_token )
+
+              gmail.users.labels.list params, (err, response) ->
+                return callback( { isApiError : true, apiName : 'gmail.users.labels.list'}, err) if err?
+                return callback(null, response.labels)
+      # filter lables
+      (labels, callback) ->
+        async.eachSeries labels, (val, next) ->
+          return next(val) if val.name == options.labelName
+          return next()
+        , (result) -> #async.eachSeries done
+          return callback({ hasNotLabelName: true }, data) unless result?
+          return callback(null, result)
+    ], (status, result) ->
+      if err?
+        return options.callback(null, null)                                                    if status.notExistsLabelName?
+        return options.callback("has not labelName. [labelName : #{options.labelName}]", null) if status.hasNotLabelName?
+        return options.callback(status, result)
+      return options.callback(null, result)
+    )
 
   #
   # get gmail list message 
   #
-  getMessagesList = (options, msg) ->
+  getMessagesList = (options) ->
     OAuthClient = getOAuthClient()
 
     params =
       userId     : 'me',
       auth       : OAuthClient
       maxResults : options.limit
-
-    params.labelIds = options.label.id if options.label?
+    params.labelIds = options.labels.id if options.labels?
 
     async.waterfall([
       # get messages.list
       (callback) ->
-        data = messages : {}
         gmail.users.messages.list params, (err, response) ->
-          unless err?
-            data.messages = response.messages
-            return callback(null, data) unless err?
+          return callback(null, response.messages) unless err?
 
           # token Expire over
           if err.code == 401
@@ -131,27 +162,32 @@ module.exports = (robot) ->
 
               gmail.users.messages.list params, (err, response) ->
                 return callback( { isApiError : true, apiName : 'gmail.users.messages.list'}, err) if err?
-                data.messages = response.messages
-                return callback(null, data)
-      # loop collector messages row
-      (data, callback) ->
-        data.num = 0
-        async.eachSeries data.messages, (val, next) ->
-          data.callback = next
-          data.message  = val
-          return callback(null, data)
-        , (err) -> #async.eachSeries done
-          console.log 'done'
-          return callback(null, data.messages)
+                return callback(null, response.messages)
 
-      #each messages get mail details
+    ], (status, result) ->
+      return options.callback(status, result) if status?
+      return options.callback(null, result)
+    )
+
+  getMessages = (options) ->
+    OAuthClient = getOAuthClient()
+
+    params =
+      userId     : 'me'
+      auth       : OAuthClient
+
+    response = []
+    async.waterfall([
+      # get messages.get
+      (callback) ->
+        async.eachSeries options.messageIds, (val, next) ->
+          params.id = val.id
+          return callback(null, { apiParams : params, eachCallback : next  })
+        , (result) -> #async.eachSeries donea
+          return callback( { isDone : true }, response )
       (data, callback) ->
-        return callback(null, data) unless data.callback?
-        gmail.users.messages.get { userId : params.userId, auth : params.auth, id : data.messages[data.num].id }, (err, response) ->
-          unless err?
-            data.messages = mergeResponseMessages(response, data.messages, data.num)
-            data.num++
-            return data.callback()
+        gmail.users.messages.get data.apiParams, (err, response) ->
+          return callback(null, { response : response, eachCallback : data.eachCallback }) unless err?
 
           # token Expire over
           if err.code == 401
@@ -161,33 +197,31 @@ module.exports = (robot) ->
               setOauthTokens(tokens)
               OAuthClient.setCredentials( access_token : tokens.access_token, refresh_token: tokens.refresh_token )
 
-              gmail.users.messages.get { userId : params.userId, auth : params.auth, id : data.messages[data.num].id }, (err, response) ->
+              gmail.users.messages.get data.apiParams, (err, response) ->
                 return callback( { isApiError : true, apiName : 'gmail.users.messages.get'}, err) if err?
+                return callback(null, { response : response, eachCallback : data.eachCallback }) unless err?
 
-                data.messages = mergeResponseMessages(response, data.messages, data.num)
-                data.num++
-                return data.callback()
+      # get message find header
+      (data, callback) ->
+        body = base64url.decode(data.response.payload.body.data) if data.response.payload.body.size > 0
+        title = ''
+        async.eachSeries data.response.payload.headers, (val, next) ->
+          if val.name == 'Subject'
+            title = val.value
+          next()
+        , (result) -> #async.eachSeries done
+          response.push({title: title, body : body})
+          return data.eachCallback()
 
-    #data toString
-    (messages, callback) ->
-      replyText = []
-      async.eachSeries messages, (val, next) ->
-        replyText.push(val.title.replace(/[\n\r]/g,"\n"))
-        #replyText.push(val.body.replace(/[\n\r]/g,"\n"))
-        next()
-      , (err) -> #async eachSeries done
-        callback(null, replyText.join("\n"))
-    ], (err, result) ->
-      if err?
-        return msg.reply "OAuth token refresh failed. [code : #{result.code} message : #{result.message}]" if err.failedRefreshAccessToken?
-        return msg.reply "Api #{err.apiName} failed. [code : #{result.code} message : #{result.message}}]" if err.isApiError?
-      return msg.reply result
+    ], (status, result) ->
+      return options.callback(status, result) if status? && status.isDone? == false
+      return options.callback(null, response)
     )
+
   #
   # respond Gmail lastetst list by label name
   #
-  robot.respond /google\s*(.gmail\sget\smessages\slist)\s(.*)?$/i, (msg) ->
-    return false unless msg.match[2]
+  robot.respond /google\s*(.gmail\sget\smessages\slist)\s?(.*)$/i, (msg) ->
     options = args2HashTable(msg.match[2])
     options.limit = 5 unless options.limit?
 
@@ -196,42 +230,20 @@ module.exports = (robot) ->
     async.waterfall([
       # get users labels list(Id list)
       (callback) ->
-        return callback({ notExistsLabelName : true}, data) unless options.labelName?
-
-        data = labels : {}
-        gmail.users.labels.list {userId: 'me', auth: OAuthClient}, (err, response) ->
-          unless err?
-            data.labels = response.labels
-            return callback(null, data) unless err?
-
-          # token Expire over
-          if err.code == 401
-            OAuthClient.refreshAccessToken (err, tokens) ->
-              return callback('failed. Google OAuth get refresh token', err) if err?
-
-              setOauthTokens(tokens)
-              OAuthClient.setCredentials( access_token : tokens.access_token, refresh_token: tokens.refresh_token )
-
-              gmail.users.labels.list {userId: 'me', auth: OAuthClient}, (err, response) ->
-                return callback('failed. Gmail API Users.labels.list', err) if err?
-                data.labels = response.labels
-                return callback(null, data)
-
-      # filter lables
-      (data, callback) ->
-        async.eachSeries data.labels, (val, next) ->
-          return next() unless val.name == options.labelName
-          data.label = val
-          return next()
-        , (err) -> #async.eachSeries done
-          return callback({ hasNotLabelName: true }, data) unless data.label?
-          return callback(null, data.label)
-
+        options.callback = callback
+        getLabelsList(options, msg)
+      (labels, callback) ->
+        options.callback = callback
+        options.labels   = labels   if labels?
+        getMessagesList(options)
+      (messagesList, callback) ->
+        getMessages({ messageIds : messagesList, callback : callback })
+      (messages, callback) ->
+        replyParse messages, callback
     ], (err, result) ->
       if err?
-        return msg.reply "has not labelName. [labelName : #{options.labelName}]" if err.hasNotLabelName?
-        return getMessagesList({limit : options.limit}, msg)                     if err.notExistsLabelName?
-
-      getMessagesList({ label : result, limit : options.limit}, msg)
+        return msg.reply "OAuth token refresh failed. [code : #{result.code} message : #{result.message}]" if err.failedRefreshAccessToken?
+        return msg.reply "Api #{err.apiName} failed. [code : #{result.code} message : #{result.message}}]" if err.isApiError?
+      return msg.reply result
     )
 
