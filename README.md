@@ -8,11 +8,14 @@ You can test your hubot by running the following.
 
 You can start hubot-gmail-notify locally by running:
 
-    % export HUBOT_GOOGLE_CLIENT_ID=your google project client id
-    % export HUBOT_GOOGLE_CLIENT_SECRET=your google project client secret
-    % export HUBOT_GOOGLE_REDIRECT_URL=your google project redirect Url
-    % export REDIS_URL=redis://127.0.0.1:6379/hubot
-    % bin/hubot
+```shell
+export HUBOT_GOOGLE_CLIENT_ID=your google project client id
+export HUBOT_GOOGLE_CLIENT_SECRET=your google project client secret
+export HUBOT_GOOGLE_REDIRECT_URL=your google project redirect Url
+export REDIS_URL=redis://127.0.0.1:6379/hubot
+bin/hubot
+```
+
 
 ## Configuration Env
 
@@ -76,7 +79,13 @@ Token information is saved in hubot.brain When you run this command
 
 ### Step5. Gmail Apis Request
 
-@todo
+```shell
+# find
+hubot google gmail get messages list
+
+# label Name find
+hubot google gmail get messages list labelName:ecnavi_error
+```
 
 ### Running hubot-gmail-notify testing mocha
 
