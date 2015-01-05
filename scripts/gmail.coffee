@@ -42,6 +42,12 @@ module.exports = (robot) ->
     [].concat.apply [], array.map (elem, i) ->
       (if i % chunkSize then [] else [array.slice(i, i + chunkSize)])
 
+  #
+  # args to HashTable 
+  # ex hoge:fuga >> {hoge:fuga}
+  # @param {String} args hoge:fuga
+  # @return {object} convert to hash
+  #
   args2HashTable = (args) ->
     params = {}
     args.split(' ').map (elem, i) ->
@@ -83,6 +89,12 @@ module.exports = (robot) ->
     return robot.brain.set(brainKeys.tokens, tokens)
 
 
+  #
+  # hubot reply to message parse ned of line and mail info 
+  # @param {Array} gmail info
+  # @param {object} callable Object
+  # @return {object} callback response
+  #
   replyParse = (messages, callback) ->
     replyText = []
     async.eachSeries messages, (val, next) ->
@@ -92,7 +104,13 @@ module.exports = (robot) ->
     , (err) -> #async eachSeries done
       return callback(null, replyText.join("\n"))
 
-  getLabelsList = (options, msg) ->
+  #
+  # gmail API Users.labels: list fetch and validate
+  # @param {String} labelName args labelName
+  # @param {object} parentCallback main process callback async waterfall
+  # @return {object} parent callback response
+  #
+  getLabelsList = (labelName, parentCallback) ->
     OAuthClient = getOAuthClient()
 
     params =
@@ -102,7 +120,7 @@ module.exports = (robot) ->
     async.waterfall([
       # get users labels list(Id list)
       (callback) ->
-        return callback({ notExistsLabelName : true}, null) unless options.labelName?
+        return callback({ notExistsLabelName : true}, null) unless labelName?
 
         gmail.users.labels.list params, (err, response) ->
           return callback(null, response.labels) unless err?
@@ -121,30 +139,33 @@ module.exports = (robot) ->
       # filter lables
       (labels, callback) ->
         async.eachSeries labels, (val, next) ->
-          return next(val) if val.name == options.labelName
+          return next(val) if val.name == labelName
           return next()
         , (result) -> #async.eachSeries done
           return callback({ hasNotLabelName: true }, data) unless result?
           return callback(null, result)
     ], (status, result) ->
       if err?
-        return options.callback(null, null)                                                    if status.notExistsLabelName?
-        return options.callback("has not labelName. [labelName : #{options.labelName}]", null) if status.hasNotLabelName?
-        return options.callback(status, result)
-      return options.callback(null, result)
+        return parentCallback(null, null)                                            if status.notExistsLabelName?
+        return parentCallback("has not labelName. [labelName : #{labelName}]", null) if status.hasNotLabelName?
+        return parentCallback(status, result)
+      return parentCallback(null, result)
     )
 
   #
-  # get gmail list message 
+  # gmail API Users.messages: list fetch and validate
+  # @param {object} apiParams api options params
+  # @param {object} parentCallback main process callback async waterfall
+  # @return {object} parent callback response
   #
-  getMessagesList = (options) ->
+  getMessagesList = (apiParams, parentCallback) ->
     OAuthClient = getOAuthClient()
 
     params =
       userId     : 'me',
       auth       : OAuthClient
-      maxResults : options.limit
-    params.labelIds = options.labels.id if options.labels?
+      maxResults : apiParams.limit
+    params.labelIds = apiParams.labels.id if apiParams.labels?
 
     async.waterfall([
       # get messages.list
@@ -165,26 +186,32 @@ module.exports = (robot) ->
                 return callback(null, response.messages)
 
     ], (status, result) ->
-      return options.callback(status, result) if status?
-      return options.callback(null, result)
+      return parentCallback(status, result) if status?
+      return parentCallback(null, result)
     )
 
-  getMessages = (options) ->
+  #
+  # gmail API Users.messages: get fetch and validate
+  # @param {Array} messageIds api option params messageIds
+  # @param {object} parentCallback main process callback async waterfall
+  # @return {object} parent callback response
+  #
+  getMessages = (messageIds, parentCallback) ->
     OAuthClient = getOAuthClient()
 
     params =
       userId     : 'me'
       auth       : OAuthClient
 
-    response = []
+    asyncResult = []
     async.waterfall([
       # get messages.get
       (callback) ->
-        async.eachSeries options.messageIds, (val, next) ->
+        async.eachSeries messageIds, (val, next) ->
           params.id = val.id
           return callback(null, { apiParams : params, eachCallback : next  })
-        , (result) -> #async.eachSeries donea
-          return callback( { isDone : true }, response )
+        , (result) -> #async.eachSeries done
+          return callback( { isDone : true }, asyncResult )
       (data, callback) ->
         gmail.users.messages.get data.apiParams, (err, response) ->
           return callback(null, { response : response, eachCallback : data.eachCallback }) unless err?
@@ -199,23 +226,23 @@ module.exports = (robot) ->
 
               gmail.users.messages.get data.apiParams, (err, response) ->
                 return callback( { isApiError : true, apiName : 'gmail.users.messages.get'}, err) if err?
-                return callback(null, { response : response, eachCallback : data.eachCallback }) unless err?
+                return callback(null, { response : response, eachCallback : data.eachCallback })
 
       # get message find header
       (data, callback) ->
         body = base64url.decode(data.response.payload.body.data) if data.response.payload.body.size > 0
         title = ''
         async.eachSeries data.response.payload.headers, (val, next) ->
-          if val.name == 'Subject'
-            title = val.value
+          title = val.value if val.name == 'Subject'
           next()
-        , (result) -> #async.eachSeries done
-          response.push({title: title, body : body})
+        , (err) -> #async.eachSeries done
+          asyncResult.push({title: title, body : body})
+          # back to first callback eachSeries
           return data.eachCallback()
 
     ], (status, result) ->
-      return options.callback(status, result) if status? && status.isDone? == false
-      return options.callback(null, response)
+      return parentCallback(status, result) if status? && status.isDone? == false
+      return parentCallback(null, asyncResult)
     )
 
   #
@@ -225,19 +252,15 @@ module.exports = (robot) ->
     options = args2HashTable(msg.match[2])
     options.limit = 5 unless options.limit?
 
-    OAuthClient = getOAuthClient()
-
     async.waterfall([
       # get users labels list(Id list)
       (callback) ->
-        options.callback = callback
-        getLabelsList(options, msg)
+        getLabelsList(options.labelName, callback)
       (labels, callback) ->
-        options.callback = callback
-        options.labels   = labels   if labels?
-        getMessagesList(options)
+        options.labels = labels if labels?
+        getMessagesList(options, callback)
       (messagesList, callback) ->
-        getMessages({ messageIds : messagesList, callback : callback })
+        getMessages(messagesList, callback)
       (messages, callback) ->
         replyParse messages, callback
     ], (err, result) ->
