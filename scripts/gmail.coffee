@@ -3,7 +3,7 @@
 #
 # Commands:
 #   hubot google gmail get messages list <n>  - I get a lastest GMail title list
-#   hubot google gmail get messages list by labelName <label name>  - get a lastest GMail list by label name.
+#   hubot google gmail get messages list labelName:hoge  - get a lastest GMail list by label name.
 #
 
 'use strict'
