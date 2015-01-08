@@ -25,11 +25,14 @@ CronJob = require("cron").CronJob
 
 module.exports = (robot) ->
 
-  google = require('googleapis')
-  gmail  = google.gmail 'v1'
-  OAuth2 = google.auth.OAuth2
-  async  = require('async')
+  google    = require('googleapis')
+  gmail     = google.gmail 'v1'
+  OAuth2    = google.auth.OAuth2
+
+  async     = require('async')
   base64url = require('base64url')
+  CronJob   = require("cron").CronJob
+  moment = require('moment')
 
   brainKeys = require('./../configs/brain_key.json')
   response = []
@@ -95,10 +98,12 @@ module.exports = (robot) ->
   # @param {object} callable Object
   # @return {object} callback response
   #
-  replyParse = (messages, callback) ->
-    replyText = []
+  replyParse = (labelName, messages, callback) ->
+    replyText = [labelName + "での検索結果だぬーーーーーーん"]
     async.eachSeries messages, (val, next) ->
-      replyText.push(val.title.replace(/[\n\r]/g,"\n"))
+      replyText.push(val.date + " " + val.title.replace(/[\n\r]/g,"\n"))
+      replyText.push(val.snippet.replace(/[\n\r]/g,"\n") + "......")
+      replyText.push("=============================================================================")
       #replyText.push(val.body.replace(/[\n\r]/g,"\n"))
       next()
     , (err) -> #async eachSeries done
@@ -230,13 +235,15 @@ module.exports = (robot) ->
 
       # get message find header
       (data, callback) ->
-        body = base64url.decode(data.response.payload.body.data) if data.response.payload.body.size > 0
+        #body = base64url.decode(data.response.payload.body.data) if data.response.payload.body.size > 0
         title = ''
+        date = ''
         async.eachSeries data.response.payload.headers, (val, next) ->
           title = val.value if val.name == 'Subject'
+          date  = moment(val.value).format('YYYY/MM/DD HH:mm:ss') if val.name == 'Date'
           next()
         , (err) -> #async.eachSeries done
-          asyncResult.push({title: title, body : body})
+          asyncResult.push({title: title, date : date, snippet: data.response.snippet})
           # back to first callback eachSeries
           return data.eachCallback()
 
@@ -262,7 +269,7 @@ module.exports = (robot) ->
       (messagesList, callback) ->
         getMessages(messagesList, callback)
       (messages, callback) ->
-        replyParse messages, callback
+        replyParse options.labels.name, messages, callback
     ], (err, result) ->
       if err?
         return msg.reply "OAuth token refresh failed. [code : #{result.code} message : #{result.message}]" if err.failedRefreshAccessToken?
