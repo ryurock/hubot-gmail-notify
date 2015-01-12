@@ -8,21 +8,6 @@
 
 'use strict'
 
-CronJob = require("cron").CronJob
-#inbox = require("inbox")
-
-#job = new CronJob(
-#  cronTime: "*/5 * * * * *"
-#  onTick: ->
-#    gmailNotify()
-#    return
-#  start: true
-#)
-#
-#gmailNotify = ->
-#  console.log "This is task A"
-
-
 module.exports = (robot) ->
 
   google    = require('googleapis')
@@ -31,11 +16,38 @@ module.exports = (robot) ->
 
   async     = require('async')
   base64url = require('base64url')
-  CronJob   = require("cron").CronJob
-  moment = require('moment')
+  cron      = require("cron").CronJob
+  moment    = require('moment')
 
   brainKeys = require('./../configs/brain_key.json')
   response = []
+
+  job = new cron(
+    cronTime: "*/5 * * * * *"
+    onTick: ->
+      options = labels : 'ecnavi_error', limit : 5
+      async.waterfall([
+        # get users labels list(Id list)
+        (callback) ->
+          getLabelsList(options.labels, callback)
+        (labels, callback) ->
+          options.labels = labels if labels?
+          getMessagesList(options, callback)
+        (messagesList, callback) ->
+          getMessages(messagesList, callback)
+        (messages, callback) ->
+          replyParse options.labels.name, messages, callback
+      ], (err, result) ->
+        if err?
+          return robot.send {room: "#test-kimura"}, "OAuth token refresh failed. [code : #{result.code} message : #{result.message}]" if err.failedRefreshAccessToken?
+          return robot.send {room: "#test-kimura"}, "Api #{err.apiName} failed. [code : #{result.code} message : #{result.message}}]" if err.isApiError?
+
+        return robot.send {room: "#test-kimura"}, result)
+      return
+    start: true
+  )
+
+
 
   #
   # Array chunk
@@ -91,7 +103,6 @@ module.exports = (robot) ->
   setOauthTokens = (tokens) ->
     return robot.brain.set(brainKeys.tokens, tokens)
 
-
   #
   # hubot reply to message parse ned of line and mail info 
   # @param {Array} gmail info
@@ -135,7 +146,7 @@ module.exports = (robot) ->
             OAuthClient.refreshAccessToken (err, tokens) ->
               return callback('failed. Google OAuth get refresh token', err) if err?
 
-              setOauthTokens(tokens)
+              Gmail.tokens = @tokens
               OAuthClient.setCredentials( access_token : tokens.access_token, refresh_token: tokens.refresh_token )
 
               gmail.users.labels.list params, (err, response) ->
@@ -147,7 +158,7 @@ module.exports = (robot) ->
           return next(val) if val.name == labelName
           return next()
         , (result) -> #async.eachSeries done
-          return callback({ hasNotLabelName: true }, data) unless result?
+          return callback({ hasNotLabelName: true }, labelName) unless result?
           return callback(null, result)
     ], (status, result) ->
       if err?
