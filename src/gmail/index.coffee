@@ -61,4 +61,10 @@ module.exports = {
   # @return {Function} callback
   #
   findMessagesList: require('./findMessagesList')
+
+  #
+  # Google Gmail API Users.messages: get
+  # @return {Function} callback
+  #
+  findMessagesGet: require('./findMessagesGet')
 }

@@ -21,7 +21,7 @@ module.exports = (labelsName, parentCallback) ->
     (callback) ->
       gmail.users.labels.list params, (err, response) ->
         return callback(null, response.labels) unless err?
-        errHandler(err,callback)
+        apiErrorHandler(err,callback)
     # filter lables
     (labels, callback) ->
       async.eachSeries labels, (val, next) ->
@@ -38,9 +38,9 @@ module.exports = (labelsName, parentCallback) ->
   )
 
   #
-  # error handler
+  # api error handler
   #
-  errHandler = (err, callback) ->
+  apiErrorHandler = (err, callback) ->
     # token Expire over
     if err.code == 401
       OAuthClient.refreshAccessToken (err, tokens) ->

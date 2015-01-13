@@ -7,7 +7,8 @@
 # @return {Function} parentCallback
 #
 module.exports = (apiParams, parentCallback) ->
-  throw new Error('args apiParams not found') unless apiParams?
+  throw new Error('args apiParams not found')              unless apiParams?
+  throw new Error('args apiParams is not Object')          unless typeof apiParams is "object"
 
   OAuthClient = @oAuthClient()
   google      = require('googleapis')
@@ -22,7 +23,7 @@ module.exports = (apiParams, parentCallback) ->
     (callback) ->
       gmail.users.messages.list params, (err, response) ->
         return callback(null, response.messages) unless err?
-        errHandler(err,callback)
+        apiErrorHandler(err,callback)
   ], (status, result) ->
     return parentCallback(null, result)   unless status?
     return parentCallback(status, result) if status.unknownError?
@@ -31,9 +32,12 @@ module.exports = (apiParams, parentCallback) ->
   )
 
   #
-  # error handler
+  # api error handler
+  # @param {object} err API error response
+  # @param {Fundtion} callback
+  # @return {Function} args callback callback
   #
-  errHandler = (err, callback) ->
+  apiErrorHandler = (err, callback) ->
     # token Expire over
     if err.code == 401
       OAuthClient.refreshAccessToken (err, tokens) ->
@@ -43,6 +47,6 @@ module.exports = (apiParams, parentCallback) ->
 
         gmail.users.messages.list params, (err, response) ->
           return callback( { isApiError : true }, err) if err?
-          return callback(null, response.labels)
+          return callback(null, response.messages)
     else
       return callback( { unknownError: true }, err)
