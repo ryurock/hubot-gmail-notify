@@ -19,18 +19,75 @@ module.exports = (robot) ->
 
   brainKeys = require('./../configs/brain_key.json')
 
+  job = new cron(
+    cronTime: "*/5 * * * * *"
+    onTick: ->
+      storageNotifyLabelsList = getNotifyLabels()
+      tokens  = getOauthTokens()
+      gmailClient.configure({
+        clientId:     process.env.HUBOT_GOOGLE_CLIENT_ID,
+        clientSecret: process.env.HUBOT_GOOGLE_CLIENT_SECRET,
+        redirectUrl:  process.env.HUBOT_GOOGLE_REDIRECT_URL,
+        tokens:       { accessToken:  tokens.access_token, refreshToken: tokens.refresh_token }
+      })
+
+      async.eachSeries storageNotifyLabelsList, (val, next) ->
+
+        async.waterfall([
+          # get users labels list(Id list)
+          (callback) ->
+            apiParams = { limit: 5, labels: { id: val.id} }
+            return gmailClient.findMessagesList(apiParams, callback)
+          (messagesList, callback) ->
+            sendedNotify = getNotifyLabelsSended()
+            newMessage   = [ messagesList.shift() ]
+            unless sendedNotify?
+              return gmailClient.findMessagesGet(newMessage, callback)
+          (messages, callback) ->
+            newMessageGet = messages.shift()
+            replyText = ["ラベル:[#{val.name}]での新着メッセージを検出しました"]
+            replyText.push("")
+            replyText.push("--------------------- ピコンピコン ┗┫￣皿￣┣┛  ピコンピコン --------------------------------")
+            replyText.push("")
+            replyText.push("date:    #{newMessageGet.date}")
+            replyText.push("subject: #{newMessageGet.title.replace(/[\n\r]/g,"\n")}")
+            replyText.push("body:    #{newMessageGet.body.replace(/[\n\r]/g,"\n")}")
+            replyText.push("")
+            replyText.push("--------------------- ピコンピコン ┗┫￣皿￣┣┛  ピコンピコン --------------------------------")
+            return callback(null, replyText.join("\n"))
+        ], (err, result) ->
+          if err?
+            return robot.send {room: "#test-kimura"}, "OAuth token refresh failed. [code : #{result.code} message : #{result.message}]" if err.failedRefreshAccessToken?
+            return robot.send {room: "#test-kimura"}, "Api #{err.apiName} failed. [code : #{result.code} message : #{result.message}}]" if err.isApiError?
+          return robot.send {room: "#test-kimura"}, result
+        )
+      , (result) -> #async.eachSeries done
+        console.log result
+
+      return
+    start: true
+  )
+
   #
   # getter tokens
   # @return {object} token response
   #
   getOauthTokens = () ->
     return robot.brain.get(brainKeys.tokens)
+
   #
-  # getter tokens
-  # @return {object} token response
+  # hubot storage get notify labels
+  # @return {object} hubot notify labels response
   #
   getNotifyLabels = () ->
     return robot.brain.get(brainKeys.notify_by_label)
+
+  #
+  # hubot storage get notify labels sended list
+  # @return {object} hubot notify labels sended list response
+  #
+  getNotifyLabelsSended = () ->
+    return robot.brain.get(brainKeys.notify_by_label_sended)
 
   #
   # add hubot brain add notify
