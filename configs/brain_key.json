@@ -1,4 +1,5 @@
 {
-  "tokens": "google_oauth_tokens",
-  "scope":  "google_oauth_scope"
+  "tokens":          "google_oauth_tokens",
+  "scope":           "google_oauth_scope",
+  "notify_by_label": "gmail_notify_labelname"
 }
