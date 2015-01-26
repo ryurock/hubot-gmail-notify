@@ -13,6 +13,7 @@ export HUBOT_GOOGLE_CLIENT_ID=your google project client id
 export HUBOT_GOOGLE_CLIENT_SECRET=your google project client secret
 export HUBOT_GOOGLE_REDIRECT_URL=your google project redirect Url
 export REDIS_URL=redis://127.0.0.1:6379/hubot
+export HUBOT_SLACK_TOKEN=your slack token
 bin/hubot
 ```
 
@@ -89,7 +90,16 @@ hubot google gmail get messages list labelName:ecnavi_error
 
 ### Running hubot-gmail-notify testing mocha
 
-    % mocha --compilers coffee:coffee-script/register --recursive -R spec
+
+```shell
+export HUBOT_GOOGLE_CLIENT_ID=your google project client id
+export HUBOT_GOOGLE_CLIENT_SECRET=your google project client secret
+export HUBOT_GOOGLE_REDIRECT_URL=your google project redirect Url
+export GOOGLE_ACCESS_TOKEN=your google API access_token
+export GOOGLE_REFRESH_TOKEN=your google API refresh token
+mocha --compilers coffee:coffee-script/register --recursive -R spec -t 5000
+```
+
 
 [Mocha](http://mochajs.org/) to Hubot Reference URL [Testable Hubot - TDDでテストを書きながらbotを作る](http://devlog.forkwell.com/2014/10/28/testable-hubot-tdddetesutowoshu-kinagarabotwozuo-ru/)
 
