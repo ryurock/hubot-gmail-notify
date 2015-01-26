@@ -18,31 +18,6 @@ module.exports = (robot) ->
 
   brainKeys = require('./../configs/brain_key.json')
 
-  #job = new cron(
-  #  cronTime: "*/5 * * * * *"
-  #  onTick: ->
-  #    options = labels : 'ecnavi_error', limit : 5
-  #    async.waterfall([
-  #      # get users labels list(Id list)
-  #      (callback) ->
-  #        getLabelsList(options.labels, callback)
-  #      (labels, callback) ->
-  #        options.labels = labels if labels?
-  #        getMessagesList(options, callback)
-  #      (messagesList, callback) ->
-  #        getMessages(messagesList, callback)
-  #      (messages, callback) ->
-  #        replyParse options.labels.name, messages, callback
-  #    ], (err, result) ->
-  #      if err?
-  #        return robot.send {room: "#test-kimura"}, "OAuth token refresh failed. [code : #{result.code} message : #{result.message}]" if err.failedRefreshAccessToken?
-  #        return robot.send {room: "#test-kimura"}, "Api #{err.apiName} failed. [code : #{result.code} message : #{result.message}}]" if err.isApiError?
-
-  #      return robot.send {room: "#test-kimura"}, result)
-  #    return
-  #  start: true
-  #)
-
   #
   # Array chunk
   #

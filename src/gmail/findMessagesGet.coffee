@@ -15,6 +15,7 @@ module.exports = (messagesIds, parentCallback) ->
   gmail       = google.gmail 'v1'
   async       = require('async')
   moment      = require('moment')
+  base64url   = require('base64url')
 
   asyncResult = []
   async.waterfall([
@@ -32,7 +33,7 @@ module.exports = (messagesIds, parentCallback) ->
 
     # get message find header
     (data, callback) ->
-      #body = base64url.decode(data.response.payload.body.data) if data.response.payload.body.size > 0
+      body  = base64url.decode(data.response.payload.body.data) if data.response.payload.body.size > 0
       title = ''
       date  = ''
       async.eachSeries data.response.payload.headers, (val, next) ->
@@ -42,9 +43,10 @@ module.exports = (messagesIds, parentCallback) ->
         return next(true) if title != '' && date != ''
         return next()
       , (isBreak) -> #async.eachSeries done
-        asyncResult.push({title: title, date : date, snippet: data.response.snippet})
+        asyncResult.push({title: title, date : date, snippet: data.response.snippet, body: body})
         title = ''
         date  = ''
+        body  = ''
         # back to first callback eachSeries
         return data.eachCallback()
 
