@@ -33,7 +33,13 @@ module.exports = (messagesIds, parentCallback) ->
 
     # get message find header
     (data, callback) ->
-      body  = base64url.decode(data.response.payload.body.data) if data.response.payload.body.size > 0
+      if data.response.payload.body.size > 0 && data.response.payload.body.data?
+        body = base64url.decode(data.response.payload.body.data)
+      else if data.response.payload.parts?
+        body = base64url.decode(data.response.payload.parts.shift().body.data)
+      else
+        body = data.response.snippet
+
       title = ''
       date  = ''
       async.eachSeries data.response.payload.headers, (val, next) ->
@@ -43,13 +49,12 @@ module.exports = (messagesIds, parentCallback) ->
         return next(true) if title != '' && date != ''
         return next()
       , (isBreak) -> #async.eachSeries done
-        asyncResult.push({title: title, date : date, snippet: data.response.snippet, body: body})
+        asyncResult.push({id: data.response.id, threadId: data.response.threadId, title: title, date : date, snippet: data.response.snippet, body: body})
         title = ''
         date  = ''
         body  = ''
         # back to first callback eachSeries
         return data.eachCallback()
-
   ], (status, result) ->
     return parentCallback(status, result) if status? && status.isDone? == false
     return parentCallback(null, asyncResult)
