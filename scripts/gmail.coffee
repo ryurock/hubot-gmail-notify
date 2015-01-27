@@ -2,7 +2,7 @@
 #   hubot Google Gmail Apis commands
 #
 # Commands:
-#   hubot google gmail get messages list limit:<n> list labelName:hoge - get a lastest Gmail list. <labelName> optional labels. <limit> optional limit. default is 5
+#   hubot google gmail get messages list [Optional]limit:<n>  [Optional]labelName:hoge - get a lastest Gmail list. <labelName> optional labels. <limit> optional limit. default is 5
 #
 
 'use strict'

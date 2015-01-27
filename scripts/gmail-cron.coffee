@@ -20,7 +20,7 @@ module.exports = (robot) ->
   brainKeys = require('./../configs/brain_key.json')
 
   job = new cron(
-    cronTime: "*/5 * * * * *"
+    cronTime: "* */1 * * * *"
     onTick: ->
       storageNotifyLabelsList = getNotifyLabels()
       tokens  = getOauthTokens()
@@ -32,34 +32,40 @@ module.exports = (robot) ->
       })
 
       async.eachSeries storageNotifyLabelsList, (val, next) ->
-
         async.waterfall([
           # get users labels list(Id list)
           (callback) ->
-            apiParams = { limit: 5, labels: { id: val.id} }
+            apiParams = { limit: 1, labels: { id: val.id} }
             return gmailClient.findMessagesList(apiParams, callback)
           (messagesList, callback) ->
-            sendedNotify = getNotifyLabelsSended()
-            newMessage   = [ messagesList.shift() ]
             unless sendedNotify?
-              return gmailClient.findMessagesGet(newMessage, callback)
+              return gmailClient.findMessagesGet(messagesList, callback)
           (messages, callback) ->
             newMessageGet = messages.shift()
-            replyText = ["ラベル:[#{val.name}]での新着メッセージを検出しました"]
-            replyText.push("")
-            replyText.push("--------------------- ピコンピコン ┗┫￣皿￣┣┛  ピコンピコン --------------------------------")
-            replyText.push("")
-            replyText.push("date:    #{newMessageGet.date}")
-            replyText.push("subject: #{newMessageGet.title.replace(/[\n\r]/g,"\n")}")
-            replyText.push("body:    #{newMessageGet.body.replace(/[\n\r]/g,"\n")}")
-            replyText.push("")
-            replyText.push("--------------------- ピコンピコン ┗┫￣皿￣┣┛  ピコンピコン --------------------------------")
-            return callback(null, replyText.join("\n"))
+            sendedNotify = getNotifyLabelsSended()
+
+            unless sendedNotify?
+              replyText = createReplyText(val.name, newMessageGet)
+              ids = { id: newMessageGet.id, threadId: newMessageGet.threadId }
+              setNotifyLabelsSended(ids)
+              return callback(null, replyText)
+
+            if newMessageGet.id != sendedNotify.id || newMessageGet.threadId != sendedNotify.threadId
+              replyText = createReplyText(val.name, newMessageGet)
+              ids = { id: newMessageGet.id, threadId: newMessageGet.threadId }
+              setNotifyLabelsSended(ids)
+              return callback(null, replyText)
+
+            return callback({alreadyNotify: true}, null)
         ], (err, result) ->
+          room = "#test" 
+          room = process.env.HUBOT_SLACK_ROOM if process.env.HUBOT_SLACK_ROOM?
           if err?
-            return robot.send {room: "#test-kimura"}, "OAuth token refresh failed. [code : #{result.code} message : #{result.message}]" if err.failedRefreshAccessToken?
-            return robot.send {room: "#test-kimura"}, "Api #{err.apiName} failed. [code : #{result.code} message : #{result.message}}]" if err.isApiError?
-          return robot.send {room: "#test-kimura"}, result
+            return robot.send {room: room}, "OAuth token refresh failed. [code : #{result.code} message : #{result.message}]" if err.failedRefreshAccessToken?
+            return robot.send {room: room}, "Api #{err.apiName} failed. [code : #{result.code} message : #{result.message}}]" if err.isApiError?
+            return console.log "already notified." if err.alreadyNotify?
+
+          return robot.send {room: room}, result
         )
       , (result) -> #async.eachSeries done
         console.log result
@@ -67,6 +73,26 @@ module.exports = (robot) ->
       return
     start: true
   )
+
+  #
+  # create reply text
+  #
+  # @param {string} label name
+  # @param {object} gmail message response object
+  # @return {string} reply text
+  #
+  createReplyText = (labelName, message) ->
+    replyText = [ "--------------------- ﾛﾎﾞﾋﾞｰﾑ!!┏┫￣皿￣┣┛‥‥…━━━━━☆) --------------------- "]
+    replyText.push("ラベル:[#{labelName}]での新着メッセージを検出しました")
+    replyText.push("")
+    replyText.push("--------------------- ピコンピコン ┗┫￣皿￣┣┛  ピコンピコン --------------------------------")
+    replyText.push("")
+    replyText.push("date:    #{message.date}")
+    replyText.push("subject: #{message.title.replace(/[\n\r]/g,"\n")}")
+    replyText.push("body:    #{message.body.replace(/[\n\r]/g,"\n")}")
+    replyText.push("")
+    replyText.push("--------------------- ピコンピコン ┗┫￣皿￣┣┛  ピコンピコン --------------------------------")
+    return replyText.join("\n")
 
   #
   # getter tokens
@@ -88,6 +114,15 @@ module.exports = (robot) ->
   #
   getNotifyLabelsSended = () ->
     return robot.brain.get(brainKeys.notify_by_label_sended)
+
+  #
+  # hubot storage set notify labels sended list
+  #
+  # @param {object} ids gmail id & gmail threadId
+  # @return {object} ids hubot notify labels sended list response
+  #
+  setNotifyLabelsSended = (ids) ->
+    return robot.brain.set(brainKeys.notify_by_label_sended, ids)
 
   #
   # add hubot brain add notify
