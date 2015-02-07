@@ -6,6 +6,7 @@
 #   hubot google gmail set notify labelName:hoge - set Notify the gmail by specifying the label
 #   hubot google gmail get notify labelsName - get all of Gmail label that has been registered for notification
 #   hubot google gmail search notify labelName:hoge - find the Gmail label that has been registered for notification
+#   hubot google gmail reset notify id - I will tarancate the last id of Gmail notification that is running in cron (message id)
 #
 
 'use strict'
@@ -20,7 +21,7 @@ module.exports = (robot) ->
   brainKeys = require('./../configs/brain_key.json')
 
   job = new cron(
-    cronTime: "* */1 * * * *"
+    cronTime: "*/1 * * * *"
     onTick: ->
       storageNotifyLabelsList = getNotifyLabels()
       tokens  = getOauthTokens()
@@ -58,14 +59,14 @@ module.exports = (robot) ->
 
             return callback({alreadyNotify: true}, null)
         ], (err, result) ->
-          room = "#test" 
+          room = "general"
           room = process.env.HUBOT_SLACK_ROOM if process.env.HUBOT_SLACK_ROOM?
           if err?
-            return robot.send {room: room}, "OAuth token refresh failed. [code : #{result.code} message : #{result.message}]" if err.failedRefreshAccessToken?
-            return robot.send {room: room}, "Api #{err.apiName} failed. [code : #{result.code} message : #{result.message}}]" if err.isApiError?
-            return console.log "already notified." if err.alreadyNotify?
+            return robot.messageRoom room, "OAuth token refresh failed. [code : #{result.code} message : #{result.message}]" if err.failedRefreshAccessToken?
+            return robot.messageRoom room, "Api #{err.apiName} failed. [code : #{result.code} message : #{result.message}}]" if err.isApiError?
+            return console.log "already sended." if err.alreadyNotify?
 
-          return robot.send {room: room}, result
+          return robot.messageRoom room, result
         )
       , (result) -> #async.eachSeries done
         console.log result
@@ -123,6 +124,9 @@ module.exports = (robot) ->
   #
   setNotifyLabelsSended = (ids) ->
     return robot.brain.set(brainKeys.notify_by_label_sended, ids)
+
+  resetNotifyLabelsSended = () ->
+    return robot.brain.set(brainKeys.notify_by_label_sended, null)
 
   #
   # add hubot brain add notify
@@ -246,7 +250,7 @@ module.exports = (robot) ->
       return msg.reply replyText.join("\n")
 
   #
-  # respond Gmail notify search by labelName
+  # respond Gmail notify cron set  by labelName
   #
   robot.respond /google\s*(.gmail\sdel\snotify)\s?(.labelName:.*)$/i, (msg) ->
     labelName = argsUtils.args2HashTable(msg.match[2]).labelName
@@ -266,3 +270,9 @@ module.exports = (robot) ->
       return msg.reply "label [#{labelName}] is notify not found." unless result?
       return msg.reply "label [#{labelName}] is notify delete."
 
+  #
+  # respond Gmail notify brain ids delete by labelName
+  #
+  robot.respond /google\s*(.gmail\sreset\snotify\sid)$/i, (msg) ->
+    resetNotifyLabelsSended()
+    return msg.reply "reset notify id is reset"
