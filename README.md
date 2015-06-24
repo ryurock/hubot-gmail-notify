@@ -85,7 +85,7 @@ Token information is saved in hubot.brain When you run this command
 hubot google gmail get messages list
 
 # label Name find
-hubot google gmail get messages list labelName:ecnavi_error
+hubot google gmail get messages list labelName:{your setting label name}
 ```
 
 ### Running hubot-gmail-notify testing mocha
